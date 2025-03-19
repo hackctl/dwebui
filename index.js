@@ -1,0 +1,163 @@
+const express = require('express');
+const Docker = require('dockerode');
+const fs = require('fs');
+
+// Docker connection configuration
+const dockerOptions = {
+    socketPath: process.env.DOCKER_SOCKET_PATH || '/var/run/docker.sock'
+};
+
+// Check if Docker socket exists and is accessible
+try {
+    if (!fs.existsSync(dockerOptions.socketPath)) {
+        throw new Error(`Docker socket not found at ${dockerOptions.socketPath}`);
+    }
+    // Check socket permissions
+    const stats = fs.statSync(dockerOptions.socketPath);
+    if (!stats.isSocket()) {
+        throw new Error(`${dockerOptions.socketPath} is not a socket file`);
+    }
+} catch (error) {
+    console.error('Docker socket check failed:', error.message);
+    process.exit(1);
+}
+
+// Create Docker instance
+const docker = new Docker(dockerOptions);
+
+// Test Docker connection
+docker.ping()
+    .then(() => {
+        console.log('Successfully connected to Docker daemon');
+        // Get Docker info to verify connection
+        return docker.info();
+    })
+    .then(info => {
+        console.log('Docker daemon info:', {
+            version: info.ServerVersion,
+            containers: info.Containers,
+            images: info.Images,
+            name: info.Name
+        });
+    })
+    .catch(err => {
+        console.error('Failed to connect to Docker daemon:', err.message);
+        console.error('Please ensure:');
+        console.error('1. Docker daemon is running');
+        console.error('2. Docker socket is accessible at:', dockerOptions.socketPath);
+        console.error('3. Container has proper permissions to access Docker socket');
+        process.exit(1);
+    });
+
+const app = express();
+app.use(express.json());
+
+const PORT = process.env.PORT || 3000;
+
+// Get all containers
+app.get('/containers', async (req, res) => {
+    try {
+        const containers = await docker.listContainers({ all: true });
+        res.json(containers);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get container details by ID
+app.get('/containers/:id', async (req, res) => {
+    try {
+        const container = docker.getContainer(req.params.id);
+        const info = await container.inspect();
+        res.json(info);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Stop a container
+app.post('/containers/:id/stop', async (req, res) => {
+    try {
+        const container = docker.getContainer(req.params.id);
+        await container.stop();
+        res.json({ message: 'Container stopped successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Start a container
+app.post('/containers/:id/start', async (req, res) => {
+    try {
+        const container = docker.getContainer(req.params.id);
+        await container.start();
+        res.json({ message: 'Container started successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get container logs
+app.get('/containers/:id/logs', async (req, res) => {
+    try {
+        const container = docker.getContainer(req.params.id);
+        const logs = await container.logs({
+            stdout: true,
+            stderr: true,
+            timestamps: true
+        });
+        res.json(logs);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get container stats
+app.get('/containers/:id/stats', async (req, res) => {
+    try {
+        const container = docker.getContainer(req.params.id);
+        const stats = await container.stats({ stream: false });
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get running containers for root endpoint
+app.get('/', async (req, res) => {
+    try {
+        const containers = await docker.listContainers({ all: false });
+        const containerInfo = await Promise.all(containers.map(async (container) => {
+            const info = await docker.getContainer(container.Id).inspect();
+            return {
+                id: container.Id.substring(0, 12),
+                name: container.Names[0].replace('/', ''),
+                image: container.Image,
+                state: container.State,
+                status: container.Status,
+                ports: container.Ports.map(port => ({
+                    internal: port.PrivatePort,
+                    external: port.PublicPort,
+                    type: port.Type
+                })),
+                mounts: info.Mounts.map(mount => ({
+                    source: mount.Source,
+                    destination: mount.Destination,
+                    type: mount.Type
+                })),
+                created: new Date(container.Created * 1000).toLocaleString()
+            };
+        }));
+
+        res.json({
+            total: containers.length,
+            containers: containerInfo
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+}); 

@@ -1,0 +1,27 @@
+services:
+  docker-manager:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - /run/docker.sock:/run/docker.sock
+    environment:
+      - PORT=3000
+      - DOCKER_SOCKET_PATH=/run/docker.sock
+    restart: unless-stopped
+    # Add resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+    # Add privileged mode for Docker socket access
+    privileged: true
+    # Add security options
+    security_opt:
+      - no-new-privileges:true
+    # Add user mapping to match host docker group
+    user: "${UID:-1000}:${GID:-1000}"
+    # Add group add for docker socket access
+    group_add:
+      - "${DOCKER_GROUP:-999}" 
