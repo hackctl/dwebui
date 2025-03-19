@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker Containers</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+        }
+        .container-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .container-name {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+        }
+        .container-status {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+        }
+        .status-running {
+            background: #e6f4ea;
+            color: #137333;
+        }
+        .container-details {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .ports {
+            margin-top: 10px;
+        }
+        .port-mapping {
+            background: #f8f9fa;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-right: 5px;
+            display: inline-block;
+        }
+        #total-containers {
+            margin-bottom: 20px;
+            font-size: 1.1em;
+            color: #666;
+        }
+        .refresh-button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .refresh-button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Docker Containers</h1>
+    <button class="refresh-button" onclick="fetchContainers()">Refresh</button>
+    <div id="total-containers"></div>
+    <div id="containers"></div>
+
+    <script>
+        function fetchContainers() {
+            fetch('/api/containers')
+                .then(response => response.json())
+                .then(data => {
+                    const containersDiv = document.getElementById('containers');
+                    document.getElementById('total-containers').textContent = 
+                        `Total Running Containers: ${data.total}`;
+                    
+                    containersDiv.innerHTML = data.containers
+                        .map(container => `
+                            <div class="container">
+                                <div class="container-header">
+                                    <span class="container-name">${container.name}</span>
+                                    <span class="container-status status-running">${container.state}</span>
+                                </div>
+                                <div class="container-details">
+                                    <div>ID: ${container.id}</div>
+                                    <div>Image: ${container.image}</div>
+                                    <div>Status: ${container.status}</div>
+                                    <div class="ports">
+                                        Ports: ${container.ports.map(port => 
+                                            `<span class="port-mapping">${port.internal}:${port.external || 'N/A'} (${port.type})</span>`
+                                        ).join(' ')}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('');
+                })
+                .catch(error => {
+                    console.error('Error fetching containers:', error);
+                    document.getElementById('containers').innerHTML = 
+                        '<div style="color: red;">Error fetching containers</div>';
+                });
+        }
+
+        // Initial fetch
+        fetchContainers();
+
+        // Refresh every 30 seconds
+        setInterval(fetchContainers, 30000);
+    </script>
+</body>
+</html> 

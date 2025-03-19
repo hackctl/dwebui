@@ -1,5 +1,6 @@
 const express = require('express');
 const Docker = require('dockerode');
+const path = require('path');
 const fs = require('fs');
 
 // Docker connection configuration
@@ -54,11 +55,38 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-// Get all containers
-app.get('/containers', async (req, res) => {
+// Serve static files
+app.use(express.static('public'));
+
+// Modify the root endpoint to serve HTML
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Move the containers list to a new endpoint
+app.get('/api/containers', async (req, res) => {
     try {
-        const containers = await docker.listContainers({ all: true });
-        res.json(containers);
+        const containers = await docker.listContainers({ all: false });
+        const containerInfo = await Promise.all(containers.map(async (container) => {
+            const info = await docker.getContainer(container.Id).inspect();
+            return {
+                id: container.Id.substring(0, 12),
+                name: container.Names[0].replace('/', ''),
+                image: container.Image,
+                state: container.State,
+                status: container.Status,
+                ports: container.Ports.map(port => ({
+                    internal: port.PrivatePort,
+                    external: port.PublicPort,
+                    type: port.Type
+                }))
+            };
+        }));
+
+        res.json({
+            total: containers.length,
+            containers: containerInfo
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -118,41 +146,6 @@ app.get('/containers/:id/stats', async (req, res) => {
         const container = docker.getContainer(req.params.id);
         const stats = await container.stats({ stream: false });
         res.json(stats);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Get running containers for root endpoint
-app.get('/', async (req, res) => {
-    try {
-        const containers = await docker.listContainers({ all: false });
-        const containerInfo = await Promise.all(containers.map(async (container) => {
-            const info = await docker.getContainer(container.Id).inspect();
-            return {
-                id: container.Id.substring(0, 12),
-                name: container.Names[0].replace('/', ''),
-                image: container.Image,
-                state: container.State,
-                status: container.Status,
-                ports: container.Ports.map(port => ({
-                    internal: port.PrivatePort,
-                    external: port.PublicPort,
-                    type: port.Type
-                })),
-                mounts: info.Mounts.map(mount => ({
-                    source: mount.Source,
-                    destination: mount.Destination,
-                    type: mount.Type
-                })),
-                created: new Date(container.Created * 1000).toLocaleString()
-            };
-        }));
-
-        res.json({
-            total: containers.length,
-            containers: containerInfo
-        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
