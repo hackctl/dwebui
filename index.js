@@ -103,25 +103,58 @@ app.get('/containers/:id', async (req, res) => {
     }
 });
 
-// Stop a container
-app.post('/containers/:id/stop', async (req, res) => {
+// Stop container
+app.post('/api/containers/:id/stop', async (req, res) => {
     try {
         const container = docker.getContainer(req.params.id);
         await container.stop();
-        res.json({ message: 'Container stopped successfully' });
+        res.json({ success: true, message: 'Container stopped' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// Start a container
-app.post('/containers/:id/start', async (req, res) => {
+// Start container
+app.post('/api/containers/:id/start', async (req, res) => {
     try {
         const container = docker.getContainer(req.params.id);
         await container.start();
-        res.json({ message: 'Container started successfully' });
+        res.json({ success: true, message: 'Container started' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Pause container
+app.post('/api/containers/:id/pause', async (req, res) => {
+    try {
+        const container = docker.getContainer(req.params.id);
+        await container.pause();
+        res.json({ success: true, message: 'Container paused' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Unpause container
+app.post('/api/containers/:id/unpause', async (req, res) => {
+    try {
+        const container = docker.getContainer(req.params.id);
+        await container.unpause();
+        res.json({ success: true, message: 'Container unpaused' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Delete container
+app.delete('/api/containers/:id', async (req, res) => {
+    try {
+        const container = docker.getContainer(req.params.id);
+        await container.remove({ force: true });
+        res.json({ success: true, message: 'Container deleted' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

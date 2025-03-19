@@ -68,6 +68,59 @@
         .refresh-button:hover {
             background: #0056b3;
         }
+        .container-actions {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+        .action-button {
+            padding: 6px 12px;
+            margin-right: 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.2s;
+        }
+        .start-button {
+            background: #28a745;
+            color: white;
+        }
+        .stop-button {
+            background: #dc3545;
+            color: white;
+        }
+        .pause-button {
+            background: #ffc107;
+            color: black;
+        }
+        .delete-button {
+            background: #6c757d;
+            color: white;
+        }
+        .action-button:hover {
+            opacity: 0.9;
+        }
+        .action-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 4px;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .toast-success {
+            background: #28a745;
+        }
+        .toast-error {
+            background: #dc3545;
+        }
     </style>
 </head>
 <body>
@@ -75,8 +128,71 @@
     <button class="refresh-button" onclick="fetchContainers()">Refresh</button>
     <div id="total-containers"></div>
     <div id="containers"></div>
+    <div id="toast" class="toast"></div>
 
     <script>
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${isError ? 'toast-error' : 'toast-success'}`;
+            toast.style.opacity = 1;
+            setTimeout(() => {
+                toast.style.opacity = 0;
+            }, 3000);
+        }
+
+        async function containerAction(id, action) {
+            try {
+                const method = action === 'delete' ? 'DELETE' : 'POST';
+                const url = action === 'delete' 
+                    ? `/api/containers/${id}`
+                    : `/api/containers/${id}/${action}`;
+
+                const response = await fetch(url, { method });
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast(`Container ${action} successful`);
+                    fetchContainers(); // Refresh the list
+                } else {
+                    showToast(data.error, true);
+                }
+            } catch (error) {
+                showToast(`Failed to ${action} container: ${error.message}`, true);
+            }
+        }
+
+        function getActionButtons(container) {
+            const state = container.state.toLowerCase();
+            return `
+                <div class="container-actions">
+                    <button 
+                        class="action-button start-button" 
+                        onclick="containerAction('${container.id}', 'start')"
+                        ${state === 'running' ? 'disabled' : ''}>
+                        Start
+                    </button>
+                    <button 
+                        class="action-button stop-button" 
+                        onclick="containerAction('${container.id}', 'stop')"
+                        ${state !== 'running' ? 'disabled' : ''}>
+                        Stop
+                    </button>
+                    <button 
+                        class="action-button pause-button" 
+                        onclick="containerAction('${container.id}', '${state === 'paused' ? 'unpause' : 'pause'}')"
+                        ${state !== 'running' && state !== 'paused' ? 'disabled' : ''}>
+                        ${state === 'paused' ? 'Unpause' : 'Pause'}
+                    </button>
+                    <button 
+                        class="action-button delete-button" 
+                        onclick="if(confirm('Are you sure you want to delete this container?')) containerAction('${container.id}', 'delete')">
+                        Delete
+                    </button>
+                </div>
+            `;
+        }
+
         function fetchContainers() {
             fetch('/api/containers')
                 .then(response => response.json())
@@ -102,6 +218,7 @@
                                         ).join(' ')}
                                     </div>
                                 </div>
+                                ${getActionButtons(container)}
                             </div>
                         `).join('');
                 })
