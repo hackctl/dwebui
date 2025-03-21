@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker Volumes</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <h1>Docker Volumes</h1>
+    
+    <button class="refresh-button" onclick="fetchVolumes()">Refresh Volumes</button>
+    <div class="create-form">
+        <input type="text" id="volume-name" placeholder="Enter volume name">
+        <button onclick="createVolume()">Create Volume</button>
+    </div>
+    <div id="total-volumes" class="total-count"></div>
+    <div id="volumes"></div>
+
+    <div id="toast" class="toast"></div>
+    <div id="loading" class="loading">Processing...</div>
+
+    <script src="/js/volumes.js"></script>
+</body>
+</html> 
