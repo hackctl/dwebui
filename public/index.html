@@ -37,6 +37,18 @@
             background: #e6f4ea;
             color: #137333;
         }
+        .status-exited {
+            background: #fce8e6;
+            color: #c5221f;
+        }
+        .status-paused {
+            background: #fef7e0;
+            color: #b06000;
+        }
+        .status-created {
+            background: #e8f0fe;
+            color: #1a73e8;
+        }
         .container-details {
             color: #666;
             font-size: 0.9em;
@@ -94,6 +106,10 @@
             background: #ffc107;
             color: black;
         }
+        .restart-button {
+            background: #17a2b8;
+            color: white;
+        }
         .delete-button {
             background: #6c757d;
             color: white;
@@ -114,12 +130,18 @@
             color: white;
             opacity: 0;
             transition: opacity 0.3s;
+            z-index: 1000;
         }
         .toast-success {
             background: #28a745;
         }
         .toast-error {
             background: #dc3545;
+        }
+        .created-date {
+            color: #666;
+            font-size: 0.85em;
+            margin-top: 5px;
         }
     </style>
 </head>
@@ -139,6 +161,21 @@
             setTimeout(() => {
                 toast.style.opacity = 0;
             }, 3000);
+        }
+
+        function getStatusClass(state) {
+            switch (state.toLowerCase()) {
+                case 'running':
+                    return 'status-running';
+                case 'exited':
+                    return 'status-exited';
+                case 'paused':
+                    return 'status-paused';
+                case 'created':
+                    return 'status-created';
+                default:
+                    return '';
+            }
         }
 
         async function containerAction(id, action) {
@@ -185,6 +222,12 @@
                         ${state === 'paused' ? 'Unpause' : 'Pause'}
                     </button>
                     <button 
+                        class="action-button restart-button" 
+                        onclick="containerAction('${container.id}', 'restart')"
+                        ${state !== 'running' ? 'disabled' : ''}>
+                        Restart
+                    </button>
+                    <button 
                         class="action-button delete-button" 
                         onclick="if(confirm('Are you sure you want to delete this container?')) containerAction('${container.id}', 'delete')">
                         Delete
@@ -199,24 +242,30 @@
                 .then(data => {
                     const containersDiv = document.getElementById('containers');
                     document.getElementById('total-containers').textContent = 
-                        `Total Running Containers: ${data.total}`;
+                        `Total Containers: ${data.total}`;
                     
+                    if (data.containers.length === 0) {
+                        containersDiv.innerHTML = '<div class="container">No containers found</div>';
+                        return;
+                    }
+
                     containersDiv.innerHTML = data.containers
                         .map(container => `
                             <div class="container">
                                 <div class="container-header">
                                     <span class="container-name">${container.name}</span>
-                                    <span class="container-status status-running">${container.state}</span>
+                                    <span class="container-status ${getStatusClass(container.state)}">${container.state}</span>
                                 </div>
                                 <div class="container-details">
                                     <div>ID: ${container.id}</div>
                                     <div>Image: ${container.image}</div>
                                     <div>Status: ${container.status}</div>
                                     <div class="ports">
-                                        Ports: ${container.ports.map(port => 
+                                        Ports: ${container.ports.length ? container.ports.map(port => 
                                             `<span class="port-mapping">${port.internal}:${port.external || 'N/A'} (${port.type})</span>`
-                                        ).join(' ')}
+                                        ).join(' ') : 'None'}
                                     </div>
+                                    <div class="created-date">Created: ${container.created}</div>
                                 </div>
                                 ${getActionButtons(container)}
                             </div>
@@ -225,7 +274,7 @@
                 .catch(error => {
                     console.error('Error fetching containers:', error);
                     document.getElementById('containers').innerHTML = 
-                        '<div style="color: red;">Error fetching containers</div>';
+                        '<div class="container" style="color: red;">Error fetching containers</div>';
                 });
         }
 
