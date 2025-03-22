@@ -1,7 +1,7 @@
-function showToast(message, isError = false) {
+function showToast(message, type = 'success') {
     const toast = document.getElementById('toast');
     toast.textContent = message;
-    toast.className = `toast ${isError ? 'toast-error' : 'toast-success'}`;
+    toast.className = `toast toast-${type}`;
     toast.style.opacity = 1;
     setTimeout(() => {
         toast.style.opacity = 0;
@@ -15,7 +15,7 @@ function showLoading(show = true) {
 async function pullImage() {
     const imageName = document.getElementById('image-name').value.trim();
     if (!imageName) {
-        showToast('Please enter an image name', true);
+        showToast('Please enter an image name', 'error');
         return;
     }
 
@@ -23,28 +23,10 @@ async function pullImage() {
         showLoading(true);
         console.log(`Attempting to pull image: ${imageName}`);
 
-        const response = await fetch('/api/images/pull', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({ image: imageName })
-        });
-
-        // Handle non-JSON responses
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            console.error('Received non-JSON response:', await response.text());
-            throw new Error('Server returned non-JSON response. Check server logs.');
-        }
-
-        const data = await response.json();
+        // Use the API helper instead of direct fetch
+        const data = await api.post('/api/images/pull', { image: imageName });
+        console.log('Pull image response:', data);
         
-        if (!response.ok) {
-            throw new Error(data.error || `Failed to pull image: ${response.statusText}`);
-        }
-
         if (data.success) {
             showToast(data.message || `Successfully pulled image: ${imageName}`);
             document.getElementById('image-name').value = '';
@@ -54,32 +36,45 @@ async function pullImage() {
         }
     } catch (error) {
         console.error('Error pulling image:', error);
-        showToast(error.message || 'Failed to pull image', true);
+        showToast(`Error pulling image: ${error.message}`, 'error');
     } finally {
         showLoading(false);
     }
 }
 
-async function deleteImage(id) {
-    if (!confirm('Are you sure you want to delete this image?')) {
+async function deleteImage(id, force = false) {
+    if (!confirm(`Are you sure you want to ${force ? 'force ' : ''}delete this image?`)) {
         return;
     }
 
     try {
         showLoading(true);
-        const response = await fetch(`/api/images/${id}`, {
-            method: 'DELETE'
-        });
-        const data = await response.json();
-
+        console.log(`Deleting image ${id} with force=${force}`);
+        
+        // Use the API helper instead of direct fetch
+        const endpoint = force ? 
+            `/api/images/${id}?force=true` : 
+            `/api/images/${id}`;
+            
+        const data = await api.delete(endpoint);
+        console.log('Delete image response:', data);
+        
         if (data.success) {
             showToast('Image deleted successfully');
-            fetchImages();
+            await fetchImages();
         } else {
-            showToast(data.error, true);
+            // Check if image is in use and force option wasn't selected
+            if (data.inUse && !force) {
+                if (confirm('This image is being used by containers. Would you like to force delete?')) {
+                    await deleteImage(id, true);
+                }
+            } else {
+                showToast(data.error || 'Failed to delete image', 'error');
+            }
         }
     } catch (error) {
-        showToast(`Failed to delete image: ${error.message}`, true);
+        console.error('Error deleting image:', error);
+        showToast(`Failed to delete image: ${error.message}`, 'error');
     } finally {
         showLoading(false);
     }
@@ -88,49 +83,81 @@ async function deleteImage(id) {
 async function fetchImages() {
     try {
         showLoading(true);
-        const response = await fetch('/api/images');
-        const data = await response.json();
+        console.log('Fetching images from API...');
         
-        const imagesDiv = document.getElementById('images');
-        document.getElementById('total-images').textContent = 
-            `Total Images: ${data.total}`;
+        // Use the API helper instead of direct fetch with full URL
+        const data = await api.get('/api/images');
+        console.log('Images API response:', data);
         
-        if (data.images.length === 0) {
-            imagesDiv.innerHTML = '<div class="container">No images found</div>';
+        // Process the data
+        if (!data || !data.success) {
+            throw new Error(data.error || 'Failed to fetch images data');
+        }
+        
+        const images = data.images || [];
+        const totalImages = data.total || 0;
+        
+        document.getElementById('total-images').textContent = `Total Images: ${totalImages}`;
+        
+        const imagesContainer = document.getElementById('images');
+        imagesContainer.innerHTML = ''; // Clear the container before adding new content
+        
+        // Handle empty image list
+        if (images.length === 0) {
+            imagesContainer.innerHTML = '<p class="no-data">No images found</p>';
             return;
         }
-
-        imagesDiv.innerHTML = data.images
-            .map(image => `
-                <div class="container">
-                    <div class="container-header">
-                        <span class="container-name">${image.repository}:${image.tag}</span>
-                    </div>
-                    <div class="container-details">
-                        <div>ID: ${image.id}</div>
-                        <div>Size: ${image.size}</div>
-                        <div>Created: ${image.created}</div>
-                        <div>Architecture: ${image.architecture}</div>
-                        <div>OS: ${image.os}</div>
-                        <div style="margin-top: 10px;">
-                            Tags: ${image.tags.map(tag => 
-                                `<span class="image-tag">${tag}</span>`
-                            ).join(' ')}
-                        </div>
-                    </div>
-                    <div class="action-section">
-                        <button 
-                            class="action-button delete-button" 
-                            onclick="deleteImage('${image.id}')">
-                            Delete
-                        </button>
-                    </div>
-                </div>
-            `).join('');
+        
+        // Create the table for images
+        let table = document.createElement('table');
+        table.className = 'data-table';
+        
+        // Create table header
+        let thead = document.createElement('thead');
+        thead.innerHTML = `
+            <tr>
+                <th>Repository</th>
+                <th>Tag</th>
+                <th>Image ID</th>
+                <th>Created</th>
+                <th>Size</th>
+                <th>Actions</th>
+            </tr>
+        `;
+        table.appendChild(thead);
+        
+        // Create table body
+        let tbody = document.createElement('tbody');
+        
+        // Add rows for each image
+        images.forEach(image => {
+            let row = document.createElement('tr');
+            
+            // Create cells for image properties
+            row.innerHTML = `
+                <td>${image.repository}</td>
+                <td>${image.tag}</td>
+                <td>${image.id}</td>
+                <td>${image.created}</td>
+                <td>${image.size}</td>
+                <td class="actions">
+                    <button class="delete-button" onclick="deleteImage('${image.id}')">Delete</button>
+                    <button class="force-delete-button" onclick="deleteImage('${image.id}', true)">Force Delete</button>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+        
+        table.appendChild(tbody);
+        imagesContainer.appendChild(table);
     } catch (error) {
         console.error('Error fetching images:', error);
-        document.getElementById('images').innerHTML = 
-            '<div class="container" style="color: red;">Error fetching images</div>';
+        showToast(`Error fetching images: ${error.message}`, 'error');
+        
+        // Display error in the images container
+        const imagesContainer = document.getElementById('images');
+        imagesContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
     } finally {
         showLoading(false);
     }

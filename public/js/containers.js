@@ -30,22 +30,27 @@ function showLoading(show = true) {
 async function containerAction(id, action) {
     try {
         showLoading(true);
-        const method = action === 'delete' ? 'DELETE' : 'POST';
-        const url = action === 'delete' 
-            ? `/api/containers/${id}`
-            : `/api/containers/${id}/${action}`;
-
-        const response = await fetch(url, { method });
-        const data = await response.json();
-
+        console.log(`Performing ${action} on container ${id}`);
+        
+        let data;
+        if (action === 'delete') {
+            data = await api.delete(`/api/containers/${id}`);
+        } else {
+            data = await api.post(`/api/containers/${id}/${action}`);
+        }
+        
+        console.log(`Container ${action} response:`, data);
+        
         if (data.success) {
             showToast(`Container ${action} successful`);
-            fetchContainers();
+            // Refresh the containers list
+            await fetchContainers();
         } else {
-            showToast(data.error, true);
+            showToast(data.error || `Failed to ${action} container`, 'error');
         }
     } catch (error) {
-        showToast(`Failed to ${action} container: ${error.message}`, true);
+        console.error(`Error performing ${action}:`, error);
+        showToast(`Error: ${error.message}`, 'error');
     } finally {
         showLoading(false);
     }
@@ -91,14 +96,17 @@ function getActionButtons(container) {
 async function fetchContainers() {
     try {
         showLoading(true);
-        const response = await fetch('/api/containers');
-        const data = await response.json();
+        console.log('Fetching containers from API...');
+        
+        // Use the API helper instead of direct fetch
+        const data = await api.get('/api/containers');
+        console.log('Containers API response:', data);
         
         const containersDiv = document.getElementById('containers');
         document.getElementById('total-containers').textContent = 
-            `Total Containers: ${data.total}`;
+            `Total Containers: ${data.total || 0}`;
         
-        if (data.containers.length === 0) {
+        if (!data.containers || data.containers.length === 0) {
             containersDiv.innerHTML = '<div class="container">No containers found</div>';
             return;
         }
@@ -115,7 +123,7 @@ async function fetchContainers() {
                         <div>Image: ${container.image}</div>
                         <div>Status: ${container.status}</div>
                         <div class="ports">
-                            Ports: ${container.ports.length ? container.ports.map(port => 
+                            Ports: ${container.ports && container.ports.length ? container.ports.map(port => 
                                 `<span class="port-mapping">${port.internal}:${port.external || 'N/A'} (${port.type})</span>`
                             ).join(' ') : 'None'}
                         </div>
@@ -127,7 +135,11 @@ async function fetchContainers() {
     } catch (error) {
         console.error('Error fetching containers:', error);
         document.getElementById('containers').innerHTML = 
-            '<div class="container" style="color: red;">Error fetching containers</div>';
+            `<div class="container" style="color: red;">
+                Error fetching containers: ${error.message}
+                <p>Check the browser console for more details.</p>
+                <p>Make sure the Docker socket is properly mounted and accessible.</p>
+            </div>`;
     } finally {
         showLoading(false);
     }

@@ -28,7 +28,11 @@ async function createVolume() {
 
     try {
         showLoading(true);
-        const response = await fetch('/api/volumes', {
+        // Use absolute path with protocol and domain
+        const fullApiPath = new URL('/api/volumes', window.location.origin).href;
+        console.log(`Sending volume create request to: ${fullApiPath}`);
+        
+        const response = await fetch(fullApiPath, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -59,7 +63,11 @@ async function deleteVolume(name) {
 
     try {
         showLoading(true);
-        const response = await fetch(`/api/volumes/${name}`, {
+        // Use absolute path with protocol and domain
+        const fullApiPath = new URL(`/api/volumes/${name}`, window.location.origin).href;
+        console.log(`Sending volume delete request to: ${fullApiPath}`);
+        
+        const response = await fetch(fullApiPath, {
             method: 'DELETE'
         });
         
@@ -81,51 +89,78 @@ async function deleteVolume(name) {
 async function fetchVolumes() {
     try {
         showLoading(true);
-        const response = await fetch('/api/volumes');
-        const data = await response.json();
+        console.log('Fetching volumes from API...');
         
-        const volumesDiv = document.getElementById('volumes');
-        document.getElementById('total-volumes').textContent = 
-            `Total Volumes: ${data.total}`;
+        // Use the API helper instead of direct fetch
+        const data = await api.get('/api/volumes');
+        console.log('Volumes API response:', data);
         
-        if (data.volumes.length === 0) {
-            volumesDiv.innerHTML = '<div class="container">No volumes found</div>';
+        // Process the data
+        if (!data || !data.success) {
+            throw new Error(data.error || 'Failed to fetch volumes data');
+        }
+        
+        const volumes = data.volumes || [];
+        const totalVolumes = data.total || 0;
+        
+        document.getElementById('total-volumes').textContent = `Total Volumes: ${totalVolumes}`;
+        
+        const volumesContainer = document.getElementById('volumes');
+        volumesContainer.innerHTML = '';
+        
+        // Handle empty volume list
+        if (volumes.length === 0) {
+            volumesContainer.innerHTML = '<p class="no-data">No volumes found</p>';
             return;
         }
-
-        volumesDiv.innerHTML = data.volumes
-            .map(volume => `
-                <div class="container">
-                    <div class="container-header">
-                        <span class="container-name">${volume.name}</span>
-                    </div>
-                    <div class="container-details">
-                        <div>Driver: ${volume.driver}</div>
-                        <div>Mount Point: ${volume.mountpoint}</div>
-                        <div>Created: ${volume.created}</div>
-                        <div>Scope: ${volume.scope}</div>
-                        ${volume.size ? `<div>Size: ${formatSize(volume.size)}</div>` : ''}
-                        ${volume.labels && Object.keys(volume.labels).length > 0 ? `
-                            <div style="margin-top: 10px;">
-                                Labels: ${Object.entries(volume.labels).map(([key, value]) => 
-                                    `<span class="label">${key}=${value}</span>`
-                                ).join(' ')}
-                            </div>
-                        ` : ''}
-                    </div>
-                    <div class="action-section">
-                        <button 
-                            class="action-button delete-button" 
-                            onclick="deleteVolume('${volume.name}')">
-                            Delete
-                        </button>
-                    </div>
-                </div>
-            `).join('');
+        
+        // Create the table for volumes
+        let table = document.createElement('table');
+        table.className = 'data-table';
+        
+        // Create table header
+        let thead = document.createElement('thead');
+        thead.innerHTML = `
+            <tr>
+                <th>Name</th>
+                <th>Driver</th>
+                <th>Mountpoint</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        `;
+        table.appendChild(thead);
+        
+        // Create table body
+        let tbody = document.createElement('tbody');
+        
+        // Add rows for each volume
+        volumes.forEach(volume => {
+            let row = document.createElement('tr');
+            
+            // Create cells for volume properties
+            row.innerHTML = `
+                <td>${volume.name}</td>
+                <td>${volume.driver}</td>
+                <td class="mountpoint">${volume.mountpoint}</td>
+                <td>${volume.created}</td>
+                <td class="actions">
+                    <button class="delete-button" onclick="deleteVolume('${volume.name}')">Delete</button>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+        
+        table.appendChild(tbody);
+        volumesContainer.appendChild(table);
     } catch (error) {
         console.error('Error fetching volumes:', error);
-        document.getElementById('volumes').innerHTML = 
-            '<div class="container" style="color: red;">Error fetching volumes</div>';
+        showToast(`Error fetching volumes: ${error.message}`, true);
+        
+        // Display error in the volumes container
+        const volumesContainer = document.getElementById('volumes');
+        volumesContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
     } finally {
         showLoading(false);
     }

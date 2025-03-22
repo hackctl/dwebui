@@ -2,9 +2,9 @@
   "name": "docker-manager",
   "version": "1.0.0",
   "description": "A Node.js application to manage Docker containers",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "dockerode": "^3.3.1",
