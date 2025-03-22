@@ -91,7 +91,7 @@ async function fetchVolumes() {
         showLoading(true);
         console.log('Fetching volumes from API...');
         
-        // Use the API helper instead of direct fetch
+        // Use the API helper instead of direct fetch with full URL
         const data = await api.get('/api/volumes');
         console.log('Volumes API response:', data);
         
@@ -106,7 +106,7 @@ async function fetchVolumes() {
         document.getElementById('total-volumes').textContent = `Total Volumes: ${totalVolumes}`;
         
         const volumesContainer = document.getElementById('volumes');
-        volumesContainer.innerHTML = '';
+        volumesContainer.innerHTML = ''; // Clear the container before adding new content
         
         // Handle empty volume list
         if (volumes.length === 0) {
@@ -126,6 +126,7 @@ async function fetchVolumes() {
                 <th>Driver</th>
                 <th>Mountpoint</th>
                 <th>Created</th>
+                <th>Size</th>
                 <th>Actions</th>
             </tr>
         `;
@@ -142,8 +143,9 @@ async function fetchVolumes() {
             row.innerHTML = `
                 <td>${volume.name}</td>
                 <td>${volume.driver}</td>
-                <td class="mountpoint">${volume.mountpoint}</td>
+                <td title="${volume.mountpoint}">${volume.mountpoint.substring(0, 30)}${volume.mountpoint.length > 30 ? '...' : ''}</td>
                 <td>${volume.created}</td>
+                <td>${volume.size}</td>
                 <td class="actions">
                     <button class="delete-button" onclick="deleteVolume('${volume.name}')">Delete</button>
                 </td>
@@ -156,7 +158,7 @@ async function fetchVolumes() {
         volumesContainer.appendChild(table);
     } catch (error) {
         console.error('Error fetching volumes:', error);
-        showToast(`Error fetching volumes: ${error.message}`, true);
+        showToast(`Error fetching volumes: ${error.message}`, 'error');
         
         // Display error in the volumes container
         const volumesContainer = document.getElementById('volumes');

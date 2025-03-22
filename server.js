@@ -142,19 +142,30 @@ app.get('/api/images', async (req, res) => {
     const images = await docker.listImages({ all: true });
     console.log(`Found ${images.length} images`);
     
-    // Simple formatting
+    // Improved consistent formatting matching containers
     const formattedImages = images.map(image => {
-      const repo = image.RepoTags && image.RepoTags.length > 0 ? image.RepoTags[0].split(':')[0] : '<none>';
-      const tag = image.RepoTags && image.RepoTags.length > 0 ? image.RepoTags[0].split(':')[1] : '<none>';
-      const size = (image.Size / 1000000).toFixed(2) + ' MB';
-      const created = new Date(image.Created * 1000).toISOString().split('T')[0];
+      // Handle missing RepoTags array
+      const repoTags = image.RepoTags && image.RepoTags.length > 0 ? image.RepoTags[0] : '<none>:<none>';
+      const [repository, tag] = repoTags.split(':');
       
+      // Calculate readable size with unit
+      const bytes = image.Size || 0;
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes > 0 ? bytes : 1) / Math.log(1024));
+      const size = (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
+      
+      // Format creation date
+      const created = image.Created 
+        ? new Date(image.Created * 1000).toISOString().split('T')[0]
+        : 'Unknown';
+        
       return {
         id: image.Id ? image.Id.substring(7, 19) : 'Unknown',
-        repository: repo,
-        tag: tag,
+        repository: repository || '<none>',
+        tag: tag || '<none>',
         size: size,
-        created: created
+        created: created,
+        labels: image.Labels || {}
       };
     });
     
@@ -175,6 +186,8 @@ app.get('/api/images', async (req, res) => {
 
 // Get all volumes - SIMPLIFIED VERSION
 app.get('/api/volumes', async (req, res) => {
+  console.log('API REQUEST: GET /api/volumes');
+  
   try {
     if (!docker) {
       return res.json({
@@ -183,17 +196,38 @@ app.get('/api/volumes', async (req, res) => {
       });
     }
     
+    console.log('Fetching volumes from Docker...');
     const volumeData = await docker.listVolumes();
     const volumes = volumeData.Volumes || [];
+    console.log(`Found ${volumes.length} volumes`);
     
-    const formattedVolumes = volumes.map(volume => ({
-      name: volume.Name || 'Unknown',
-      driver: volume.Driver || 'local',
-      mountpoint: volume.Mountpoint || 'Unknown',
-      created: volume.CreatedAt || 'Unknown',
-      size: '—'
-    }));
+    // Improved consistent formatting matching containers
+    const formattedVolumes = volumes.map(volume => {
+      // Format creation date if available
+      let created = 'Unknown';
+      if (volume.CreatedAt) {
+        try {
+          // Try to parse the creation date
+          const date = new Date(volume.CreatedAt);
+          created = date.toISOString().split('T')[0];
+        } catch (e) {
+          created = volume.CreatedAt;
+        }
+      }
+      
+      return {
+        name: volume.Name || 'Unknown',
+        driver: volume.Driver || 'local',
+        mountpoint: volume.Mountpoint || 'Unknown',
+        created: created,
+        size: '—', // Volumes don't report size by default
+        labels: volume.Labels || {},
+        scope: volume.Scope || 'local',
+        options: volume.Options || {}
+      };
+    });
     
+    console.log('Sending volumes response');
     return res.json({
       success: true,
       total: formattedVolumes.length,
