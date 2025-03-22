@@ -28,28 +28,21 @@ async function createVolume() {
 
     try {
         showLoading(true);
-        // Use absolute path with protocol and domain
-        const fullApiPath = new URL('/api/volumes', window.location.origin).href;
-        console.log(`Sending volume create request to: ${fullApiPath}`);
+        console.log(`Creating volume: ${volumeName}`);
         
-        const response = await fetch(fullApiPath, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ name: volumeName })
-        });
-        
-        const data = await response.json();
+        // Use the API helper instead of direct fetch
+        const data = await api.post('/api/volumes', { name: volumeName });
+        console.log('Create volume response:', data);
         
         if (data.success) {
             showToast('Volume created successfully');
             document.getElementById('volume-name').value = '';
-            fetchVolumes();
+            await fetchVolumes();
         } else {
-            showToast(data.error, 'error');
+            throw new Error(data.error || 'Failed to create volume');
         }
     } catch (error) {
+        console.error('Error creating volume:', error);
         showToast(`Failed to create volume: ${error.message}`, 'error');
     } finally {
         showLoading(false);
@@ -63,23 +56,25 @@ async function deleteVolume(name) {
 
     try {
         showLoading(true);
-        // Use absolute path with protocol and domain
-        const fullApiPath = new URL(`/api/volumes/${name}`, window.location.origin).href;
-        console.log(`Sending volume delete request to: ${fullApiPath}`);
+        console.log(`Deleting volume: ${name}`);
         
-        const response = await fetch(fullApiPath, {
-            method: 'DELETE'
-        });
-        
-        const data = await response.json();
+        // Use the API helper instead of direct fetch
+        const data = await api.delete(`/api/volumes/${name}`);
+        console.log('Delete volume response:', data);
         
         if (data.success) {
             showToast('Volume deleted successfully');
-            fetchVolumes();
+            await fetchVolumes();
         } else {
-            showToast(data.error, 'error');
+            // Check if volume is in use and handle appropriately
+            if (data.inUse) {
+                showToast('This volume is in use by containers and cannot be deleted', 'error');
+            } else {
+                throw new Error(data.error || 'Failed to delete volume');
+            }
         }
     } catch (error) {
+        console.error('Error deleting volume:', error);
         showToast(`Failed to delete volume: ${error.message}`, 'error');
     } finally {
         showLoading(false);
@@ -147,7 +142,7 @@ async function fetchVolumes() {
                 <td>${volume.created}</td>
                 <td>${volume.size}</td>
                 <td class="actions">
-                    <button class="delete-button" onclick="deleteVolume('${volume.name}')">Delete</button>
+                    <button class="action-button delete-button" onclick="deleteVolume('${volume.name}')">Delete</button>
                 </td>
             `;
             

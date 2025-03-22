@@ -103,12 +103,8 @@ body {
     background: #17a2b8;
     color: white;
 }
-.delete-button {
+.delete-button, .force-delete-button {
     background: #dc3545;
-    color: white;
-}
-.force-delete-button {
-    background: #6c757d;
     color: white;
 }
 .action-button:hover {

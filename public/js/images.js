@@ -141,8 +141,8 @@ async function fetchImages() {
                 <td>${image.created}</td>
                 <td>${image.size}</td>
                 <td class="actions">
-                    <button class="delete-button" onclick="deleteImage('${image.id}')">Delete</button>
-                    <button class="force-delete-button" onclick="deleteImage('${image.id}', true)">Force Delete</button>
+                    <button class="action-button delete-button" onclick="deleteImage('${image.id}')">Delete</button>
+                    <button class="action-button delete-button" onclick="deleteImage('${image.id}', true)">Force Delete</button>
                 </td>
             `;
             
