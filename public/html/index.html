@@ -14,6 +14,9 @@
                 <button onclick="refreshData()" class="refresh-button">
                     <i class="fas fa-sync-alt"></i> Refresh
                 </button>
+                <a href="/html/containers.html" class="refresh-button">Containers</a>
+                <a href="/html/images.html" class="refresh-button">Images</a>
+                <a href="/html/volumes.html" class="refresh-button">Volumes</a>
             </div>
         </header>
 
@@ -119,45 +122,7 @@
             </div>
         </div>
 
-        <div class="data-section">
-            <div class="section-header">
-                <h2>Docker Resources</h2>
-            </div>
-            <div class="data-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Resource Type</th>
-                            <th>Count</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Containers</td>
-                            <td id="container-count">-</td>
-                            <td>
-                                <a href="/html/containers.html" class="action-button">View Containers</a>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>Images</td>
-                            <td id="image-count">-</td>
-                            <td>
-                                <a href="/html/images.html" class="action-button">View Images</a>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>Volumes</td>
-                            <td id="volume-count">-</td>
-                            <td>
-                                <a href="/html/volumes.html" class="action-button">View Volumes</a>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+
     </div>
 
     <script src="/js/api-helper.js"></script>
@@ -170,11 +135,6 @@
                     api.get('/api/volumes'),
                     api.get('/api/stats')
                 ]);
-
-                // Update container counts
-                document.getElementById('container-count').textContent = containers.total || 0;
-                document.getElementById('image-count').textContent = images.total || 0;
-                document.getElementById('volume-count').textContent = volumes.total || 0;
 
                 // Update container status - using container state counts from containers list
                 const containerStates = {
