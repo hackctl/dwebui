@@ -84,6 +84,49 @@ app.get('/volumes', (req, res) => {
 
 // *** CRITICAL API ROUTES ***
 
+// Get container stats
+async function getDockerStats() {
+  if (!docker) return null;
+  
+  try {
+    const containers = await docker.listContainers({ all: true });
+    let totalCpu = 0;
+    let totalMemory = 0;
+    let totalIO = 0;
+
+    for (const container of containers) {
+      if (container.State === 'running') {
+        const containerInstance = docker.getContainer(container.Id);
+        const stats = await containerInstance.stats({ stream: false });
+        
+        // Calculate CPU usage
+        const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
+        const systemDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
+        const cpuPercent = (cpuDelta / systemDelta) * 100;
+        totalCpu += cpuPercent;
+
+        // Calculate memory usage (in MB)
+        const memoryUsage = stats.memory_stats.usage / (1024 * 1024);
+        totalMemory += memoryUsage;
+
+        // Calculate I/O usage (in MB/s)
+        const ioRead = stats.blkio_stats.io_service_bytes_recursive?.[0]?.value || 0;
+        const ioWrite = stats.blkio_stats.io_service_bytes_recursive?.[1]?.value || 0;
+        totalIO += (ioRead + ioWrite) / (1024 * 1024);
+      }
+    }
+
+    return {
+      cpu: totalCpu.toFixed(2),
+      memory: totalMemory.toFixed(2),
+      io: totalIO.toFixed(2)
+    };
+  } catch (error) {
+    console.error('Error getting Docker stats:', error);
+    return null;
+  }
+}
+
 // Get all containers
 app.get('/api/containers', async (req, res) => {
   try {
@@ -95,6 +138,7 @@ app.get('/api/containers', async (req, res) => {
     }
     
     const containers = await docker.listContainers({ all: true });
+    
     const formattedContainers = containers.map(container => {
       // Basic container info
       return {
@@ -127,6 +171,34 @@ app.get('/api/containers', async (req, res) => {
 });
 
 // Get all images - SIMPLIFIED VERSION
+// Get system stats
+app.get('/api/stats', async (req, res) => {
+  try {
+    if (!docker) {
+      return res.json({
+        success: false,
+        error: 'Docker client not initialized'
+      });
+    }
+
+    const stats = await getDockerStats();
+    if (stats) {
+      res.json({
+        success: true,
+        ...stats
+      });
+    } else {
+      throw new Error('Failed to get Docker stats');
+    }
+  } catch (error) {
+    console.error('Error getting stats:', error);
+    res.json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 app.get('/api/images', async (req, res) => {
   console.log('API REQUEST: GET /api/images');
   

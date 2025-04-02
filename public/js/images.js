@@ -116,7 +116,7 @@ async function fetchImages() {
         let thead = document.createElement('thead');
         thead.innerHTML = `
             <tr>
-                <th>Repository</th>
+                <th>Image Name</th>
                 <th>Tag</th>
                 <th>Image ID</th>
                 <th>Created</th>
