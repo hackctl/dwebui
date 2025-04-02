@@ -69,6 +69,58 @@
 
         <div class="data-section">
             <div class="section-header">
+                <h2>Image Status</h2>
+            </div>
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Total</th>
+                            <th>Used</th>
+                            <th>Unused</th>
+                            <th>Dangling</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td id="images-total">-</td>
+                            <td id="images-used">-</td>
+                            <td id="images-unused">-</td>
+                            <td id="images-dangling">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="data-section">
+            <div class="section-header">
+                <h2>Volume Status</h2>
+            </div>
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Total</th>
+                            <th>Used</th>
+                            <th>Unused</th>
+                            <th>Dangling</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td id="volumes-total">-</td>
+                            <td id="volumes-used">-</td>
+                            <td id="volumes-unused">-</td>
+                            <td id="volumes-dangling">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="data-section">
+            <div class="section-header">
                 <h2>Docker Resources</h2>
             </div>
             <div class="data-table">
@@ -144,6 +196,67 @@
                 document.getElementById('containers-stopped').textContent = containerStates.stopped;
                 document.getElementById('containers-created').textContent = containerStates.created;
                 document.getElementById('containers-exited').textContent = containerStates.exited;
+
+                // Update image status
+                const imageStates = {
+                    total: images.total || 0,
+                    used: 0,
+                    unused: 0,
+                    dangling: 0
+                };
+
+                const usedImages = new Set();
+                containers.containers.forEach(container => {
+                    usedImages.add(container.image);
+                });
+
+                images.images.forEach(image => {
+                    if (image.repository === '<none>' && image.tag === '<none>') {
+                        imageStates.dangling++;
+                    } else if (usedImages.has(`${image.repository}:${image.tag}`)) {
+                        imageStates.used++;
+                    } else {
+                        imageStates.unused++;
+                    }
+                });
+
+                document.getElementById('images-total').textContent = imageStates.total;
+                document.getElementById('images-used').textContent = imageStates.used;
+                document.getElementById('images-unused').textContent = imageStates.unused;
+                document.getElementById('images-dangling').textContent = imageStates.dangling;
+
+                // Update volume status
+                const volumeStates = {
+                    total: volumes.total || 0,
+                    used: 0,
+                    unused: 0,
+                    dangling: 0
+                };
+
+                const usedVolumes = new Set();
+                containers.containers.forEach(container => {
+                    const mounts = container.mounts || [];
+                    mounts.forEach(mount => {
+                        if (mount && mount.type === 'volume' && mount.name) {
+                            usedVolumes.add(mount.name);
+                        }
+                    });
+                });
+
+                volumes.volumes.forEach(volume => {
+                    if (usedVolumes.has(volume.name)) {
+                        volumeStates.used++;
+                    } else if (!volume.labels || Object.keys(volume.labels).length === 0) {
+                        volumeStates.dangling++;
+                    } else {
+                        volumeStates.unused++;
+                    }
+                });
+
+                document.getElementById('volumes-total').textContent = volumeStates.total;
+                document.getElementById('volumes-used').textContent = volumeStates.used;
+                document.getElementById('volumes-unused').textContent = volumeStates.unused;
+                document.getElementById('volumes-dangling').textContent = volumeStates.dangling;
 
                 // Update resource usage
                 document.getElementById('cpu-usage').textContent = stats.cpu ? `${stats.cpu}%` : '-';

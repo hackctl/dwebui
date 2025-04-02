@@ -152,6 +152,12 @@ app.get('/api/containers', async (req, res) => {
           internal: port.PrivatePort || 'N/A',
           external: port.PublicPort || 'N/A',
           type: port.Type || 'tcp'
+        })),
+        mounts: container.Mounts.map(mount => ({
+          type: mount.Type,
+          name: mount.Name,
+          source: mount.Source,
+          destination: mount.Destination
         }))
       };
     });
